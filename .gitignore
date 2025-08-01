@@ -1,0 +1,41 @@
+# Java
+*.class
+*.jar
+!gradle/wrapper/gradle-wrapper.jar
+!build/libs/Langflow-*-mendix.jar
+
+# Gradle
+.gradle/
+build/
+!build/libs/
+
+# IDE
+.vscode/
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+
+# Package files
+*.war
+*.ear
+*.zip
+*.tar.gz
+*.rar
+
+# Virtual machine crash logs
+hs_err_pid*

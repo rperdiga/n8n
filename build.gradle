@@ -1,0 +1,68 @@
+plugins {
+    id 'java'
+    id 'com.github.johnrengelman.shadow' version '8.1.1'
+}
+
+group = 'com.company.mendix'
+version = '1.0.0'
+sourceCompatibility = '11'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // Testing
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.9.2'
+}
+
+// Shadow JAR configuration for Mendix deployment
+shadowJar {
+    archiveClassifier = ''
+    archiveFileName = "${project.name}-${project.version}-mendix.jar"
+    
+    // Merge service files
+    mergeServiceFiles()
+}
+
+// Task to copy JAR to Mendix project
+task copyToMendix(type: Copy, dependsOn: shadowJar) {
+    from shadowJar.outputs.files
+    into 'C:\\Mendix Projects\\Sample\\userlib'
+    
+    doLast {
+        println "Copied ${shadowJar.archiveFileName.get()} to Mendix project userlib folder"
+    }
+}
+
+// Task to copy JAR using manual method (fallback)
+task copyJarToMendix {
+    dependsOn 'jar'
+    doLast {
+        def sourceFile = file("build/libs/Langflow-1.0.0-mendix.jar")
+        def targetDir = file("C:\\Mendix Projects\\Sample\\userlib")
+        def targetFile = new File(targetDir, "Langflow-1.0.0-mendix.jar")
+        
+        // Create target directory if it doesn't exist
+        targetDir.mkdirs()
+        
+        // Copy the file
+        if (sourceFile.exists()) {
+            sourceFile.withInputStream { input ->
+                targetFile.withOutputStream { output ->
+                    output << input
+                }
+            }
+            println "Successfully copied JAR to: ${targetFile.absolutePath}"
+        } else {
+            throw new GradleException("Source JAR file not found: ${sourceFile.absolutePath}")
+        }
+    }
+}
+
+// Make build automatically copy to Mendix
+build.finalizedBy copyJarToMendix
+
+test {
+    useJUnitPlatform()
+}
