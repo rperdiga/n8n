@@ -15,10 +15,12 @@ import java.time.Duration;
  * This implementation provides:
  * - REST API call to n8n webhook endpoint
  * - API key authentication (optional)
+ * - Session ID support for n8n Simple Memory (required)
  * - Input/output parameter handling
  * - Error handling and logging
  * 
  * Note: This version uses only built-in Java libraries for maximum compatibility
+ * Note: Session ID is mandatory for all operations to support n8n Simple Memory
  */
 public class N8nAction {
     
@@ -26,38 +28,42 @@ public class N8nAction {
     private final String apiKey;
     private final String webhookEndpoint;
     private final String inputData;
+    private final String sessionId;
     private final String contentType;
     private final int timeoutMinutes;
     
     /**
-     * Constructor for n8n Action with custom timeout
+     * Constructor for n8n Action with custom timeout and session ID
      * 
      * @param apiKey The n8n API key for authentication (optional, can be null)
      * @param webhookEndpoint The complete n8n webhook URL
      * @param inputData The data to send to n8n webhook
+     * @param sessionId The session ID for n8n Simple Memory (required)
      * @param contentType The content type (default: "application/json")
      * @param timeoutMinutes Timeout in minutes for API response (default: 10)
      */
     public N8nAction(String apiKey, String webhookEndpoint, String inputData, 
-                     String contentType, int timeoutMinutes) {
+                     String sessionId, String contentType, int timeoutMinutes) {
         this.apiKey = apiKey;
         this.webhookEndpoint = webhookEndpoint;
         this.inputData = inputData;
+        this.sessionId = sessionId;
         this.contentType = contentType != null ? contentType : "application/json";
         this.timeoutMinutes = timeoutMinutes > 0 ? timeoutMinutes : 10;
     }
     
     /**
-     * Constructor for n8n Action
+     * Constructor for n8n Action with session ID
      * 
      * @param apiKey The n8n API key for authentication (optional, can be null)
      * @param webhookEndpoint The complete n8n webhook URL
      * @param inputData The data to send to n8n webhook
+     * @param sessionId The session ID for n8n Simple Memory (required)
      * @param contentType The content type (default: "application/json")
      */
     public N8nAction(String apiKey, String webhookEndpoint, String inputData, 
-                     String contentType) {
-        this(apiKey, webhookEndpoint, inputData, contentType, 10);
+                     String sessionId, String contentType) {
+        this(apiKey, webhookEndpoint, inputData, sessionId, contentType, 10);
     }
     
     /**
@@ -66,9 +72,10 @@ public class N8nAction {
      * @param apiKey The n8n API key for authentication (optional, can be null)
      * @param webhookEndpoint The complete n8n webhook URL
      * @param inputData The data to send to n8n webhook
+     * @param sessionId The session ID for n8n Simple Memory (required)
      */
-    public N8nAction(String apiKey, String webhookEndpoint, String inputData) {
-        this(apiKey, webhookEndpoint, inputData, "application/json", 10);
+    public N8nAction(String apiKey, String webhookEndpoint, String inputData, String sessionId) {
+        this(apiKey, webhookEndpoint, inputData, sessionId, "application/json", 10);
     }
     
     /**
@@ -104,6 +111,13 @@ public class N8nAction {
             if (apiKey != null && !apiKey.trim().isEmpty()) {
                 requestBuilder.header("Authorization", "Bearer " + apiKey);
             }
+            
+            // Add session ID header for n8n Simple Memory (required)
+            if (sessionId == null || sessionId.trim().isEmpty()) {
+                throw new Exception("Session ID is required for n8n Simple Memory functionality");
+            }
+            requestBuilder.header("x-session-id", sessionId);
+            System.out.println("Session ID: " + sessionId);
             
             HttpRequest request = requestBuilder.build();
             
@@ -248,11 +262,41 @@ public class N8nAction {
     }
     
     /**
-     * Static method for easy invocation from Mendix
+     * Automatically wrap any text input in JSON format
+     * This allows users to pass plain text which gets converted to {"message": "text"}
      */
-    public static String execute(String apiKey, String webhookEndpoint, String inputData) {
+    private static String ensureJsonFormat(String inputData) {
+        if (inputData == null || inputData.trim().isEmpty()) {
+            return "{\"message\": \"\"}";
+        }
+        
+        // Check if it's already JSON (starts with { or [)
+        String trimmed = inputData.trim();
+        if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+            return inputData; // Already JSON, return as-is
+        }
+        
+        // Not JSON, wrap it in a message object
+        // Escape quotes and backslashes in the text
+        String escapedText = inputData.replace("\\", "\\\\")
+                                     .replace("\"", "\\\"")
+                                     .replace("\n", "\\n")
+                                     .replace("\r", "\\r")
+                                     .replace("\t", "\\t");
+        
+        return "{\"message\": \"" + escapedText + "\"}";
+    }
+    
+    /**
+     * Static method with session ID for n8n Simple Memory
+     * Main entry point for Mendix integration - requires session ID
+     * Automatically converts plain text to JSON format
+     */
+    public static String execute(String apiKey, String webhookEndpoint, String inputData, 
+                                String sessionId) {
         try {
-            N8nAction action = new N8nAction(apiKey, webhookEndpoint, inputData);
+            String jsonData = ensureJsonFormat(inputData);
+            N8nAction action = new N8nAction(apiKey, webhookEndpoint, jsonData, sessionId);
             return action.executeAction();
         } catch (Exception e) {
             return "Error executing n8n action: " + e.getMessage();
@@ -260,12 +304,15 @@ public class N8nAction {
     }
     
     /**
-     * Static method with all parameters
+     * Static method with all parameters including session ID
+     * Automatically converts plain text to JSON format
      */
     public static String execute(String apiKey, String webhookEndpoint, String inputData, 
-                                String contentType) {
+                                String sessionId, String contentType) {
         try {
-            N8nAction action = new N8nAction(apiKey, webhookEndpoint, inputData, contentType);
+            String jsonData = ensureJsonFormat(inputData);
+            N8nAction action = new N8nAction(apiKey, webhookEndpoint, jsonData, 
+                                           sessionId, contentType);
             return action.executeAction();
         } catch (Exception e) {
             return "Error executing n8n action: " + e.getMessage();
@@ -274,12 +321,14 @@ public class N8nAction {
     
     /**
      * Static method with custom timeout for long-running n8n processes
+     * Automatically converts plain text to JSON format
      */
     public static String execute(String apiKey, String webhookEndpoint, String inputData, 
-                                String contentType, int timeoutMinutes) {
+                                String sessionId, String contentType, int timeoutMinutes) {
         try {
-            N8nAction action = new N8nAction(apiKey, webhookEndpoint, inputData, 
-                                           contentType, timeoutMinutes);
+            String jsonData = ensureJsonFormat(inputData);
+            N8nAction action = new N8nAction(apiKey, webhookEndpoint, jsonData, 
+                                           sessionId, contentType, timeoutMinutes);
             return action.executeAction();
         } catch (Exception e) {
             return "Error executing n8n action: " + e.getMessage();
@@ -287,13 +336,15 @@ public class N8nAction {
     }
     
     /**
-     * Static method with custom timeout (simplified version)
+     * Static method with custom timeout and session ID (simplified version)
+     * Automatically converts plain text to JSON format
      */
     public static String executeWithTimeout(String apiKey, String webhookEndpoint, String inputData, 
-                                          int timeoutMinutes) {
+                                          String sessionId, int timeoutMinutes) {
         try {
-            N8nAction action = new N8nAction(apiKey, webhookEndpoint, inputData, 
-                                           "application/json", timeoutMinutes);
+            String jsonData = ensureJsonFormat(inputData);
+            N8nAction action = new N8nAction(apiKey, webhookEndpoint, jsonData, 
+                                           sessionId, "application/json", timeoutMinutes);
             return action.executeAction();
         } catch (Exception e) {
             return "Error executing n8n action: " + e.getMessage();

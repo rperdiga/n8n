@@ -8,6 +8,8 @@ This guide provides step-by-step instructions for implementing the n8n Webhook J
 2. **n8n instance** (self-hosted or cloud)
 3. **Active n8n workflow with webhook trigger**
 
+⚠️ **Important**: Session ID is mandatory for all webhook calls in this implementation to support n8n Simple Memory functionality.
+
 ## Step 1: Deploy the JAR File
 
 ### Option A: Use the automated script (Windows)
@@ -27,33 +29,52 @@ This guide provides step-by-step instructions for implementing the n8n Webhook J
 1. **Right-click** on your module → **Add** → **Java Action**
 2. **Name**: `CallN8nWebhook`
 3. **Add Parameters**:
-   - `ApiKey` (String) - Optional for public webhooks
-   - `WebhookEndpoint` (String) - Your n8n webhook URL
-   - `InputData` (String) - JSON data to send
+   - `apiKey` (String) - Optional for public webhooks
+   - `apiEndPoint` (String) - Your n8n webhook URL
+   - `userPrompt` (String) - Any text or JSON data (automatically converted to JSON if needed)
+   - `sessionId` (String) - Required for n8n Simple Memory support
 4. **Return Type**: String
 5. **Java Implementation**:
 
 ```java
 // BEGIN USER CODE
-return com.company.mendix.n8n.N8nAction.execute(ApiKey, WebhookEndpoint, InputData);
+return com.company.mendix.n8n.N8nAction.execute(apiKey, apiEndPoint, userPrompt, sessionId);
 // END USER CODE
 ```
 
-### Advanced Java Action with Content Type
+### Session Support Java Action
 
-For custom content types (XML, plain text, etc.):
+For applications requiring conversation continuity with n8n Simple Memory:
 
 ```java
 // BEGIN USER CODE
-return com.company.mendix.n8n.N8nAction.execute(ApiKey, WebhookEndpoint, InputData, ContentType);
+// Generate or retrieve session ID
+String sessionId = sessionId != null && !sessionId.isEmpty() ? sessionId : 
+                   "user-" + $CurrentUser/Name + "-" + System.currentTimeMillis();
+
+return com.company.mendix.n8n.N8nAction.execute(apiKey, apiEndPoint, userPrompt, sessionId);
 // END USER CODE
 ```
 
 Parameters:
-- `ApiKey` (String)
-- `WebhookEndpoint` (String)
-- `InputData` (String)
-- `ContentType` (String) - e.g., "application/xml", "text/plain"
+- `apiKey` (String)
+- `apiEndPoint` (String)
+- `userPrompt` (String)
+- `sessionId` (String) - For conversation continuity
+
+### Advanced Java Action with Content Type
+
+⚠️ **Note**: This approach is not recommended with the current implementation. Session ID is mandatory. Use the Session + Content Type approach below instead.
+
+### Session + Content Type Java Action
+
+For applications requiring both session support and custom content types:
+
+```java
+// BEGIN USER CODE
+return com.company.mendix.n8n.N8nAction.execute(apiKey, apiEndPoint, userPrompt, sessionId, contentType);
+// END USER CODE
+```
 
 ## Step 3: Configure Your n8n Workflow
 
@@ -69,11 +90,13 @@ Parameters:
    ```javascript
    // Example function node to process incoming data
    const inputData = items[0].json;
+   const sessionId = $request.headers['x-session-id'];
    
    return [{
      json: {
        result: "processed",
        original_data: inputData,
+       session_id: sessionId,
        processed_at: new Date().toISOString()
      }
    }];
@@ -88,20 +111,61 @@ Parameters:
 ### Basic Usage Pattern
 
 1. **Create Input Variables**:
-   - `WebhookURL` (String): Your n8n webhook URL
-   - `RequestData` (String): JSON string to send
+   - `webhookURL` (String): Your n8n webhook URL
+   - `requestData` (String): Any text content (automatically converted to JSON)
+   - `sessionId` (String): Session ID for conversation continuity (required)
 
 2. **Call Java Action**:
    - Drag `CallN8nWebhook` into microflow
    - Map parameters:
-     - ApiKey: Leave empty for public webhooks or use your API key
-     - WebhookEndpoint: $WebhookURL
-     - InputData: $RequestData
+     - apiKey: Leave empty for public webhooks or use your API key
+     - apiEndPoint: $webhookURL
+     - userPrompt: $requestData (can be plain text or JSON)
+     - sessionId: $sessionId (required - generate if not provided)
 
 3. **Process Response**:
    - Store result in variable
    - Parse JSON if needed
    - Handle errors appropriately
+
+## Automatic JSON Formatting
+
+### ✅ **Great News**: No More JSON Formatting Required!
+
+The Java Action now automatically handles JSON formatting for you. You can pass either:
+
+### **Option 1: Plain Text (Recommended)**
+Just pass your text directly - it will be automatically wrapped in JSON:
+
+**Input:**
+```text
+We're in our annual strategic planning process and the C-suite is divided...
+```
+
+**Automatically becomes:**
+```json
+{"message": "We're in our annual strategic planning process and the C-suite is divided..."}
+```
+
+### **Option 2: Pre-formatted JSON (Advanced)**
+If you need custom JSON structure, you can still pass JSON directly:
+
+**Input:**
+```json
+{"message": "Your text", "user": "john", "priority": "high"}
+```
+
+**Result:**
+Your JSON is passed through unchanged.
+
+### **How It Works:**
+- ✅ **Plain Text Detection**: If input doesn't start with `{` or `[`, it's wrapped as `{"message": "your text"}`
+- ✅ **JSON Passthrough**: If input starts with `{` or `[`, it's sent as-is
+- ✅ **Automatic Escaping**: Special characters (quotes, newlines, etc.) are automatically escaped
+- ✅ **Safe Handling**: Empty/null input becomes `{"message": ""}`
+
+### **No More 422 Errors!**
+The automatic JSON wrapping eliminates the "Failed to parse request body" error you encountered.
 
 ### Example Microflow Implementation
 
@@ -131,11 +195,19 @@ Parameters:
    }
    ```
 
+4. **Missing Session ID**:
+   ```java
+   if (result.contains("Session ID is required")) {
+       // Handle missing session ID error
+       // Generate session ID or prompt user
+   }
+   ```
+
 3. **Timeout Issues**:
    ```java
    // Use extended timeout for long-running workflows
    return com.company.mendix.n8n.N8nAction.executeWithTimeout(
-       ApiKey, WebhookEndpoint, InputData, 20 // 20 minutes
+       apiKey, apiEndPoint, userPrompt, sessionId, 20 // 20 minutes
    );
    ```
 
@@ -154,10 +226,12 @@ String orderData = "{" +
 "}";
 
 // Call n8n workflow
+String sessionId = "order-" + $Order/OrderNumber + "-" + System.currentTimeMillis();
 String result = com.company.mendix.n8n.N8nAction.execute(
-    $ApiKey, 
+    $apiKey, 
     "https://your-n8n.com/webhook/process-order", 
-    orderData
+    orderData,
+    sessionId
 );
 ```
 
@@ -178,29 +252,52 @@ String fileData = "{" +
 "}";
 
 // Use extended timeout for file processing
+String sessionId = "file-" + $Document/Name + "-" + System.currentTimeMillis();
 String result = com.company.mendix.n8n.N8nAction.executeWithTimeout(
-    $ApiKey,
+    $apiKey,
     "https://your-n8n.com/webhook/process-file",
     fileData,
+    sessionId,
     30 // 30 minutes timeout
 );
 ```
+
+### Example 3: Chatbot with Session Memory
+
+**Mendix Side:**
+```java
+// Generate or retrieve session ID for user
+String sessionId = $ChatSession/SessionId;
+if (sessionId == null || sessionId.isEmpty()) {
+    sessionId = "chat-" + $CurrentUser/Name + "-" + System.currentTimeMillis();
+    // Save session ID to ChatSession entity
+    $ChatSession/SessionId = sessionId;
+}
+
+String chatData = "{" +
+    "\"message\": \"" + $UserMessage + "\"," +
+    "\"user_id\": \"" + $CurrentUser/Name + "\"," +
+    "\"timestamp\": \"" + java.time.Instant.now().toString() + "\"" +
+"}";
+
+// Call n8n chatbot with session support
+String result = com.company.mendix.n8n.N8nAction.execute(
+    $apiKey,
+    "https://your-n8n.com/webhook/chatbot",
+    chatData,
+    sessionId
+);
+```
+
+**n8n Workflow with Simple Memory:**
+- Webhook → Simple Memory → AI Chatbot → Respond
+- The Simple Memory node automatically uses the x-session-id header to maintain conversation context
 
 ## Testing Your Implementation
 
 ### 1. Test Webhook Connectivity
 
-Create a simple test microflow:
-```java
-String testData = "{\"test\": \"connection\", \"timestamp\": \"" + 
-                  java.time.Instant.now().toString() + "\"}";
-
-String result = com.company.mendix.n8n.N8nAction.execute(
-    null, 
-    "https://your-n8n.com/webhook/test", 
-    testData
-);
-```
+Create a simple test microflow with your n8n webhook URL and session ID.
 
 ### 2. Validate Response Handling
 
@@ -213,6 +310,7 @@ Test with:
 - Network disconnection
 - n8n instance downtime
 - Malformed JSON data
+- Empty or null session IDs
 
 ## Best Practices
 
@@ -222,6 +320,36 @@ Test with:
 4. **Validate JSON before sending**
 5. **Use environment-specific webhook URLs**
 6. **Implement retry logic for critical operations**
+7. **Manage session IDs appropriately for conversational flows**
+8. **Generate unique session IDs per user/conversation**
+9. **Store session IDs in persistent entities for ongoing conversations**
+
+## Session ID Management
+
+### Generating Session IDs
+Always ensure you have a valid session ID before calling the n8n webhook:
+
+```java
+// Option 1: Generate based on user and timestamp
+String sessionId = "user-" + $CurrentUser/Name + "-" + System.currentTimeMillis();
+
+// Option 2: Generate based on conversation context
+String sessionId = "chat-" + $ConversationId + "-" + System.currentTimeMillis();
+
+// Option 3: Use existing session ID from entity
+String sessionId = $ChatSession/SessionId != null && !$ChatSession/SessionId.isEmpty() ? 
+                   $ChatSession/SessionId : 
+                   "new-session-" + System.currentTimeMillis();
+```
+
+### Session ID Validation
+```java
+// Validate session ID before calling
+if (sessionId == null || sessionId.trim().isEmpty()) {
+    // Generate a new session ID
+    sessionId = "generated-" + System.currentTimeMillis();
+}
+```
 
 ## Troubleshooting
 
@@ -230,6 +358,7 @@ Test with:
 | Issue | Solution |
 |-------|----------|
 | "Class not found" | Refresh Mendix project, check JAR in userlib |
+| "Session ID is required" | Ensure SessionId parameter is provided and not empty |
 | Connection timeout | Increase timeout, check n8n instance |
 | Invalid JSON | Validate JSON structure before sending |
 | 404 errors | Verify webhook URL and n8n workflow status |

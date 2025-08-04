@@ -1,12 +1,30 @@
-# n8n Webhook Java Action Setup and Test Script
-# This script sets up the development environment and runs tests
+# n8n Webhook Java Action Setup Script
+# This script sets up if (!$SkipTests) {
+    Write-Host "`nStep 4: Run tests..." -ForegroundColor Cyan
+    & .\gradlew test
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "All tests passed" -ForegroundColor Green
+    } else {
+        Write-Host "Some tests failed - check output above" -ForegroundColor Yellow
+    }
+    
+    Write-Host "`nStep 5: Run example..." -ForegroundColor Cyan
+    try {
+        & java -cp "build\classes\java\main" com.company.mendix.n8n.examples.N8nExample
+    } catch {
+        Write-Host "Example run completed (connection errors expected)" -ForegroundColor Yellow
+    }
+} else {
+    Write-Host "`nStep 4: Skipping tests..." -ForegroundColor Yellow
+}
+
+Write-Host "`nStep 6: Build JAR..." -ForegroundColor Cyanhe development environment and builds the JAR
 
 param(
-    [string]$MendixProjectPath = "C:\Mendix Projects\Sample",
-    [switch]$SkipTests = $false
+    [string]$MendixProjectPath = "C:\Mendix Projects\Sample"
 )
 
-Write-Host "=== n8n Webhook Java Action Setup and Test ===" -ForegroundColor Green
+Write-Host "=== n8n Webhook Java Action Setup ===" -ForegroundColor Green
 Write-Host "Target Mendix Project: $MendixProjectPath" -ForegroundColor Yellow
 
 # Set working directory
@@ -42,26 +60,7 @@ if ($LASTEXITCODE -eq 0) {
     exit 1
 }
 
-if (!$SkipTests) {
-    Write-Host "`nStep 4: Run tests..." -ForegroundColor Cyan
-    & .\gradlew test
-    if ($LASTEXITCODE -eq 0) {
-        Write-Host "All tests passed" -ForegroundColor Green
-    } else {
-        Write-Host "Some tests failed - check output above" -ForegroundColor Yellow
-    }
-    
-    Write-Host "`nStep 5: Run example..." -ForegroundColor Cyan
-    try {
-        & java -cp "build\classes\java\main" com.company.mendix.n8n.examples.N8nExample
-    } catch {
-        Write-Host "Example run completed (connection errors expected)" -ForegroundColor Yellow
-    }
-} else {
-    Write-Host "`nStep 4: Skipping tests..." -ForegroundColor Yellow
-}
-
-Write-Host "`nStep 6: Build JAR..." -ForegroundColor Cyan
+Write-Host "`nStep 4: Build JAR..." -ForegroundColor Cyan
 & .\gradlew shadowJar
 if ($LASTEXITCODE -eq 0) {
     Write-Host "JAR build successful" -ForegroundColor Green
@@ -70,7 +69,7 @@ if ($LASTEXITCODE -eq 0) {
     exit 1
 }
 
-Write-Host "`nStep 7: Deploy to Mendix..." -ForegroundColor Cyan
+Write-Host "`nStep 5: Deploy to Mendix..." -ForegroundColor Cyan
 $mendixUserLib = Join-Path $MendixProjectPath "userlib"
 if (!(Test-Path $mendixUserLib)) {
     Write-Host "Creating Mendix userlib directory..." -ForegroundColor Yellow
@@ -91,7 +90,7 @@ if (Test-Path $sourceJar) {
     exit 1
 }
 
-Write-Host "`nStep 8: Validation..." -ForegroundColor Cyan
+Write-Host "`nStep 6: Validation..." -ForegroundColor Cyan
 
 # Check JAR contents
 Write-Host "JAR Contents:" -ForegroundColor White
@@ -108,9 +107,10 @@ Write-Host "3. Create a Java Action with these parameters:" -ForegroundColor Whi
 Write-Host "   - ApiKey (String) - optional for public webhooks" -ForegroundColor Yellow
 Write-Host "   - WebhookEndpoint (String)" -ForegroundColor Yellow
 Write-Host "   - InputData (String)" -ForegroundColor Yellow
+Write-Host "   - SessionId (String) - required for n8n Simple Memory" -ForegroundColor Yellow
 Write-Host "4. Return type: String" -ForegroundColor White
 Write-Host "5. Java code:" -ForegroundColor White
-Write-Host "   return com.company.mendix.n8n.N8nAction.execute(ApiKey, WebhookEndpoint, InputData);" -ForegroundColor Cyan
+Write-Host "   return com.company.mendix.n8n.N8nAction.execute(ApiKey, WebhookEndpoint, InputData, SessionId);" -ForegroundColor Cyan
 
 Write-Host "`n=== Example n8n Webhook URLs ===" -ForegroundColor Cyan
 Write-Host "Production: https://your-n8n.company.com/webhook/workflow-name" -ForegroundColor White
@@ -121,13 +121,5 @@ Write-Host "`n=== Documentation ===" -ForegroundColor Cyan
 Write-Host "README.md - Complete usage guide" -ForegroundColor White
 Write-Host "MENDIX_IMPLEMENTATION_GUIDE.md - Step-by-step Mendix setup" -ForegroundColor White
 Write-Host "TIMEOUT_CONFIGURATION_GUIDE.md - Timeout configuration help" -ForegroundColor White
-Write-Host "PARAMETER_RENAME_SUMMARY.md - Migration from Langflow" -ForegroundColor White
-
-if (!$SkipTests) {
-    Write-Host "`n=== Test Results Summary ===" -ForegroundColor Cyan
-    if (Test-Path "build\reports\tests\test\index.html") {
-        Write-Host "Test report: build\reports\tests\test\index.html" -ForegroundColor White
-    }
-}
 
 Write-Host "`n=== Ready to use! ===" -ForegroundColor Green

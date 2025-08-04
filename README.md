@@ -10,6 +10,7 @@ A Java Action for Mendix Studio Pro that enables seamless integration with n8n w
 - ✅ **Extended Timeouts**: Configurable timeouts (up to 60 minutes) for long-running workflows
 - ✅ **Multiple Content Types**: Support for JSON, XML, plain text, and custom content types
 - ✅ **Error Handling**: Comprehensive validation and error messages
+- ✅ **Session Support**: Session ID required for n8n Simple Memory feature
 - ✅ **Zero Dependencies**: Pure Java implementation using built-in HTTP client
 - ✅ **Lightweight**: Small JAR file (~7KB) with no external dependencies
 
@@ -61,11 +62,12 @@ Refresh your Mendix project in Studio Pro to recognize the new JAR file.
    - `apiKey` (String) - Your n8n API key (optional for public webhooks)
    - `webhookEndpoint` (String) - Complete n8n webhook URL
    - `inputData` (String) - JSON payload to send to n8n
+   - `sessionId` (String) - Session ID for conversation continuity (required)
 4. **Set Return Type**: `String`
 5. **Java Code**:
    ```java
    // BEGIN USER CODE
-   return com.company.mendix.n8n.N8nAction.execute(apiKey, webhookEndpoint, inputData);
+   return com.company.mendix.n8n.N8nAction.execute(apiKey, webhookEndpoint, inputData, sessionId);
    // END USER CODE
    ```
 
@@ -76,31 +78,68 @@ Refresh your Mendix project in Studio Pro to recognize the new JAR file.
    - **apiKey**: Your n8n API key (leave empty for public webhooks)
    - **webhookEndpoint**: Your n8n webhook URL (e.g., `https://your-n8n.com/webhook/workflow-id`)
    - **inputData**: JSON string with your data (e.g., `{"user": "john", "action": "process"}`)
+   - **sessionId**: Session ID for conversation continuity (required for n8n Simple Memory)
 3. Use the returned string in your application logic
 
 ## 📚 API Reference
 
-### Basic Method (10-minute timeout)
+### Main Method (requires session ID)
 ```java
-N8nAction.execute(String apiKey, String webhookEndpoint, String inputData)
+N8nAction.execute(String apiKey, String webhookEndpoint, String inputData, String sessionId)
 ```
 
-### Custom Content Type Method
+### Session + Content Type Method
 ```java
-N8nAction.execute(String apiKey, String webhookEndpoint, String inputData, String contentType)
+N8nAction.execute(String apiKey, String webhookEndpoint, String inputData, String sessionId, String contentType)
 ```
 
-### Custom Timeout Method
+### Session + Timeout Method
 ```java
-N8nAction.executeWithTimeout(String apiKey, String webhookEndpoint, String inputData, int timeoutMinutes)
+N8nAction.executeWithTimeout(String apiKey, String webhookEndpoint, String inputData, String sessionId, int timeoutMinutes)
 ```
 
-### Full Control Method
+### Full Control with Session Method
 ```java
-N8nAction.execute(String apiKey, String webhookEndpoint, String inputData, String contentType, int timeoutMinutes)
+N8nAction.execute(String apiKey, String webhookEndpoint, String inputData, String sessionId, String contentType, int timeoutMinutes)
 ```
+
+## 🧠 Session Support for n8n Simple Memory
+
+The library supports session IDs for n8n's Simple Memory feature, enabling conversation continuity across multiple webhook calls.
+
+### How Session IDs Work
+
+1. **Session Creation**: Generate a unique session ID for each conversation/user
+2. **Session Continuity**: Use the same session ID across related webhook calls
+3. **Memory Access**: n8n Simple Memory uses the session ID to maintain conversation context
+
+### Session ID Examples
+
+```java
+// Generate unique session ID
+String sessionId = "user-" + userId + "-" + System.currentTimeMillis();
+
+// Or use existing user/conversation identifier
+String sessionId = "conversation-" + conversationId;
+
+// First interaction
+String response1 = N8nAction.execute(apiKey, webhookUrl, 
+    "{\"message\": \"Hello, my name is John\"}", sessionId);
+
+// Follow-up interaction (n8n remembers the name)
+String response2 = N8nAction.execute(apiKey, webhookUrl, 
+    "{\"message\": \"What's my name?\"}", sessionId);
+```
+
+### Session ID Best Practices
+
+- **Unique per conversation**: Each conversation should have its own session ID
+- **Consistent format**: Use a consistent naming pattern (e.g., `user-{id}-{timestamp}`)
+- **Meaningful identifiers**: Include user/conversation identifiers when possible
+- **Session management**: Consider session cleanup and expiration in your application
 
 ## ⏱️ Timeout Configuration
+
 
 | Use Case | Recommended Timeout | Method |
 |----------|-------------------|--------|
@@ -127,6 +166,7 @@ The library sends HTTP POST requests to n8n webhooks with your custom payload:
 ```
 Content-Type: application/json (or custom)
 Authorization: Bearer your-api-key-here (if provided)
+x-session-id: your-session-id-here (if provided)
 ```
 
 ### Response Processing
@@ -144,30 +184,21 @@ The library provides comprehensive validation:
 - **HTTP Errors**: "Webhook request failed with status code: XXX"
 - **Timeout Errors**: "Request timeout after X minutes"
 
-## 🧪 Testing
+## 🧪 Building
 
-### Run Unit Tests
+### Build the JAR
 ```bash
-./gradlew test
+./gradlew shadowJar
 ```
 
-### Run Examples
-```bash
-./gradlew run
-# or
-java -cp "build/classes" com.company.mendix.n8n.examples.N8nExample
-```
+This creates `build/libs/n8n-1.0.0-mendix.jar`
 
 ## 📁 Project Structure
 
 ```
 src/
-├── main/java/com/company/mendix/n8n/
-│   ├── N8nAction.java                   # Main implementation
-│   └── examples/
-│       └── N8nExample.java              # Usage examples
-└── test/java/com/company/mendix/n8n/
-    └── N8nActionTest.java               # Unit tests
+└── main/java/com/company/mendix/n8n/
+    └── N8nAction.java                   # Main implementation
 
 deploy-to-mendix.ps1                     # Automated deployment script
 quick-deploy.bat                         # Quick deployment batch file
@@ -176,31 +207,47 @@ build.gradle                             # Build configuration
 
 ## 🚀 Quick Start Examples
 
-### Example 1: Basic Webhook Call
+### Example 1: Basic Webhook Call with Session
 ```java
 // In your Mendix Java Action
 String apiKey = null; // No authentication needed
 String webhookEndpoint = "https://your-n8n.com/webhook/simple-workflow";
 String inputData = "{\"message\": \"Hello from Mendix!\", \"user\": \"john\"}";
+String sessionId = "user-session-" + System.currentTimeMillis();
 
-String result = N8nAction.execute(apiKey, webhookEndpoint, inputData);
+String result = N8nAction.execute(apiKey, webhookEndpoint, inputData, sessionId);
 ```
 
-### Example 2: Authenticated Webhook
+### Example 2: Authenticated Webhook with Session
 ```java
 String apiKey = "your-n8n-api-key";
 String webhookEndpoint = "https://your-n8n.com/webhook/secure-workflow";
 String inputData = "{\"action\": \"process_order\", \"order_id\": 12345}";
+String sessionId = "order-session-" + orderId;
 
-String result = N8nAction.execute(apiKey, webhookEndpoint, inputData);
+String result = N8nAction.execute(apiKey, webhookEndpoint, inputData, sessionId);
 ```
 
 ### Example 3: Custom Timeout for Long Workflows
 ```java
-String result = N8nAction.executeWithTimeout(apiKey, webhookEndpoint, inputData, 20);
+String sessionId = "long-task-" + System.currentTimeMillis();
+String result = N8nAction.executeWithTimeout(apiKey, webhookEndpoint, inputData, sessionId, 20);
 ```
 
-### Example 4: Custom Content Type
+### Example 4: Session Support for n8n Simple Memory
+```java
+String sessionId = "user-session-" + System.currentTimeMillis();
+
+// First message in conversation
+String result1 = N8nAction.execute(apiKey, webhookEndpoint, 
+    "{\"message\": \"Hello, I need help\"}", sessionId);
+
+// Second message in same conversation
+String result2 = N8nAction.execute(apiKey, webhookEndpoint, 
+    "{\"message\": \"Can you remember what I asked?\"}", sessionId);
+```
+
+### Example 5: Custom Content Type
 ```java
 String xmlData = "<?xml version=\"1.0\"?><order><id>123</id></order>";
 String result = N8nAction.execute(apiKey, webhookEndpoint, xmlData, "application/xml");
@@ -215,9 +262,6 @@ String result = N8nAction.execute(apiKey, webhookEndpoint, xmlData, "application
 
 # Build JAR
 ./gradlew shadowJar
-
-# Run tests
-./gradlew test
 
 # Clean build
 ./gradlew clean build

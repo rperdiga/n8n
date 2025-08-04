@@ -11,11 +11,6 @@ repositories {
     mavenCentral()
 }
 
-dependencies {
-    // Testing
-    testImplementation 'org.junit.jupiter:junit-jupiter:5.9.2'
-}
-
 // Shadow JAR configuration for Mendix deployment
 shadowJar {
     archiveClassifier = ''
@@ -62,7 +57,3 @@ task copyJarToMendix {
 
 // Make build automatically copy to Mendix
 build.finalizedBy copyJarToMendix
-
-test {
-    useJUnitPlatform()
-}
