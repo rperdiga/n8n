@@ -1,8 +1,8 @@
 @echo off
-echo === Quick Build and Deploy to Mendix ===
+echo === Quick Build and Deploy n8n to Mendix ===
 echo.
 
-cd /d "C:\Extensions\Langflow"
+cd /d "C:\Extensions\n8n JavaAction"
 
 echo Building JAR...
 call gradlew copyJarToMendix

@@ -19,7 +19,7 @@ dependencies {
 // Shadow JAR configuration for Mendix deployment
 shadowJar {
     archiveClassifier = ''
-    archiveFileName = "${project.name}-${project.version}-mendix.jar"
+    archiveFileName = "n8n-${project.version}-mendix.jar"
     
     // Merge service files
     mergeServiceFiles()
@@ -39,9 +39,9 @@ task copyToMendix(type: Copy, dependsOn: shadowJar) {
 task copyJarToMendix {
     dependsOn 'jar'
     doLast {
-        def sourceFile = file("build/libs/Langflow-1.0.0-mendix.jar")
+        def sourceFile = file("build/libs/n8n-1.0.0-mendix.jar")
         def targetDir = file("C:\\Mendix Projects\\Sample\\userlib")
-        def targetFile = new File(targetDir, "Langflow-1.0.0-mendix.jar")
+        def targetFile = new File(targetDir, "n8n-1.0.0-mendix.jar")
         
         // Create target directory if it doesn't exist
         targetDir.mkdirs()

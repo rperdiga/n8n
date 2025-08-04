@@ -1,16 +1,16 @@
-# Build and Deploy Langflow JAR to Mendix Project
-# This script builds the Langflow Java Action and copies it to your Mendix project
+# Build and Deploy n8n JAR to Mendix Project
+# This script builds the n8n Java Action and copies it to your Mendix project
 
 param(
     [string]$MendixProjectPath = "C:\Mendix Projects\Sample"
 )
 
-Write-Host "=== Langflow JAR Build and Deploy Script ===" -ForegroundColor Green
+Write-Host "=== n8n JAR Build and Deploy Script ===" -ForegroundColor Green
 Write-Host "Target Mendix Project: $MendixProjectPath" -ForegroundColor Yellow
 
-# Set the working directory to the Langflow project
-$LangflowProjectPath = "C:\Extensions\Langflow"
-Set-Location $LangflowProjectPath
+# Set the working directory to the n8n project
+$N8nProjectPath = "C:\Extensions\n8n JavaAction"
+Set-Location $N8nProjectPath
 
 Write-Host "`nStep 1: Cleaning previous builds..." -ForegroundColor Cyan
 if (Test-Path "build\libs") {
@@ -40,7 +40,7 @@ if (!(Test-Path $libsDir)) {
     New-Item -ItemType Directory -Path $libsDir -Force | Out-Null
 }
 
-jar -cvf "$libsDir\Langflow-1.0.0-mendix.jar" -C $classesDir .
+jar -cvf "$libsDir\n8n-1.0.0-mendix.jar" -C $classesDir .
 if ($LASTEXITCODE -eq 0) {
     Write-Host "JAR creation successful" -ForegroundColor Green
 } else {
@@ -58,8 +58,8 @@ if (!(Test-Path $mendixUserLib)) {
 }
 
 Write-Host "`nStep 5: Copying JAR to Mendix project..." -ForegroundColor Cyan
-$sourceJar = "$libsDir\Langflow-1.0.0-mendix.jar"
-$targetJar = Join-Path $mendixUserLib "Langflow-1.0.0-mendix.jar"
+$sourceJar = "$libsDir\n8n-1.0.0-mendix.jar"
+$targetJar = Join-Path $mendixUserLib "n8n-1.0.0-mendix.jar"
 
 if (Test-Path $sourceJar) {
     Copy-Item $sourceJar $targetJar -Force
@@ -86,11 +86,11 @@ if (Test-Path $targetJar) {
 Write-Host "`n=== Next Steps for Mendix Studio Pro ===" -ForegroundColor Green
 Write-Host "1. Refresh your Mendix project in Studio Pro" -ForegroundColor White
 Write-Host "2. Create a new Java Action with these parameters:" -ForegroundColor White
-Write-Host "   - apiKey (String)" -ForegroundColor Yellow
-Write-Host "   - apiEndpoint (String)" -ForegroundColor Yellow
-Write-Host "   - userPrompt (String)" -ForegroundColor Yellow
+Write-Host "   - apiKey (String) - optional for public webhooks" -ForegroundColor Yellow
+Write-Host "   - webhookEndpoint (String)" -ForegroundColor Yellow
+Write-Host "   - inputData (String)" -ForegroundColor Yellow
 Write-Host "3. Set return type to: String" -ForegroundColor White
 Write-Host "4. Add this code to the Java Action:" -ForegroundColor White
-Write-Host "   return com.company.mendix.langflow.LangflowAction.execute(apiKey, apiEndpoint, userPrompt);" -ForegroundColor Cyan
+Write-Host "   return com.company.mendix.n8n.N8nAction.execute(apiKey, webhookEndpoint, inputData);" -ForegroundColor Cyan
 
 Write-Host "`n=== Build and Deploy Complete! ===" -ForegroundColor Green

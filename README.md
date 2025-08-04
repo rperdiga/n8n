@@ -1,12 +1,14 @@
-# Mendix Langflow Integration
+# Mendix n8n Integration
 
-A Java Action for Mendix Studio Pro that enables seamless integration with Langflow APIs. This library provides a simple, drag-and-drop solution for calling Langflow workflows from Mendix applications.
+A Java Action for Mendix Studio Pro that enables seamless integration with n8n webhooks. This library provides a simple, drag-and-drop solution for calling n8n workflows from Mendix applications.
 
 ## 🚀 Features
 
 - ✅ **Easy Integration**: Simple Java Action for Mendix Studio Pro
-- ✅ **API Key Authentication**: Secure authentication with Langflow APIs  
-- ✅ **Extended Timeouts**: Configurable timeouts (up to 60 minutes) for long-running processes
+- ✅ **Webhook Support**: Call n8n webhooks with custom payloads
+- ✅ **Optional Authentication**: Support for secured webhooks with API keys
+- ✅ **Extended Timeouts**: Configurable timeouts (up to 60 minutes) for long-running workflows
+- ✅ **Multiple Content Types**: Support for JSON, XML, plain text, and custom content types
 - ✅ **Error Handling**: Comprehensive validation and error messages
 - ✅ **Zero Dependencies**: Pure Java implementation using built-in HTTP client
 - ✅ **Lightweight**: Small JAR file (~7KB) with no external dependencies
@@ -15,7 +17,7 @@ A Java Action for Mendix Studio Pro that enables seamless integration with Langf
 
 - **Java 11+**
 - **Mendix Studio Pro**
-- **Langflow Server** (running and accessible)
+- **n8n Instance** (self-hosted or cloud)
 
 ## 🛠️ Installation
 
@@ -25,13 +27,13 @@ A Java Action for Mendix Studio Pro that enables seamless integration with Langf
 ./gradlew shadowJar
 ```
 
-This creates `build/libs/Langflow-1.0.0-mendix.jar`
+This creates `build/libs/n8n-1.0.0-mendix.jar`
 
 ### 2. Deploy to Mendix Project
 
 #### Option A: Manual Copy
 ```bash
-cp build/libs/Langflow-1.0.0-mendix.jar /path/to/your/mendix/project/userlib/
+cp build/libs/n8n-1.0.0-mendix.jar /path/to/your/mendix/project/userlib/
 ```
 
 #### Option B: Automated Deployment (Windows)
@@ -54,87 +56,92 @@ Refresh your Mendix project in Studio Pro to recognize the new JAR file.
 ### Create Java Action
 
 1. **Right-click** on a module → **Add** → **Java Action**
-2. **Name**: `CallLangflow` (or your preferred name)
+2. **Name**: `CallN8nWebhook` (or your preferred name)
 3. **Add Parameters**:
-   - `apiKey` (String) - Your Langflow API key
-   - `apiEndpoint` (String) - Complete Langflow API endpoint URL
-   - `userPrompt` (String) - User prompt/question to send to Langflow
+   - `apiKey` (String) - Your n8n API key (optional for public webhooks)
+   - `webhookEndpoint` (String) - Complete n8n webhook URL
+   - `inputData` (String) - JSON payload to send to n8n
 4. **Set Return Type**: `String`
 5. **Java Code**:
    ```java
    // BEGIN USER CODE
-   return com.company.mendix.langflow.LangflowAction.execute(apiKey, apiEndpoint, userPrompt);
+   return com.company.mendix.n8n.N8nAction.execute(apiKey, webhookEndpoint, inputData);
    // END USER CODE
    ```
 
 ### Use in Microflows
 
-1. Drag the `CallLangflow` Java Action into your microflow
+1. Drag the `CallN8nWebhook` Java Action into your microflow
 2. Set the input parameters:
-   - **apiKey**: Your Langflow API key
-   - **apiEndpoint**: Your Langflow endpoint URL (e.g., `http://localhost:7860/api/v1/run/your-flow-id`)
-   - **userPrompt**: The user's question or prompt
+   - **apiKey**: Your n8n API key (leave empty for public webhooks)
+   - **webhookEndpoint**: Your n8n webhook URL (e.g., `https://your-n8n.com/webhook/workflow-id`)
+   - **inputData**: JSON string with your data (e.g., `{"user": "john", "action": "process"}`)
 3. Use the returned string in your application logic
 
 ## 📚 API Reference
 
 ### Basic Method (10-minute timeout)
 ```java
-LangflowAction.execute(String apiKey, String apiEndpoint, String userPrompt)
+N8nAction.execute(String apiKey, String webhookEndpoint, String inputData)
+```
+
+### Custom Content Type Method
+```java
+N8nAction.execute(String apiKey, String webhookEndpoint, String inputData, String contentType)
 ```
 
 ### Custom Timeout Method
 ```java
-LangflowAction.executeWithTimeout(String apiKey, String apiEndpoint, String userPrompt, int timeoutMinutes)
+N8nAction.executeWithTimeout(String apiKey, String webhookEndpoint, String inputData, int timeoutMinutes)
 ```
 
 ### Full Control Method
 ```java
-LangflowAction.execute(String apiKey, String apiEndpoint, String userPrompt, String outputType, String inputType, int timeoutMinutes)
+N8nAction.execute(String apiKey, String webhookEndpoint, String inputData, String contentType, int timeoutMinutes)
 ```
 
 ## ⏱️ Timeout Configuration
 
 | Use Case | Recommended Timeout | Method |
 |----------|-------------------|--------|
-| Simple text processing | 10 minutes (default) | `execute()` |
-| Complex AI workflows | 15-20 minutes | `executeWithTimeout()` |
-| Document analysis | 20-30 minutes | `executeWithTimeout()` |
-| Large data processing | 30+ minutes | `executeWithTimeout()` |
+| Simple webhook calls | 10 minutes (default) | `execute()` |
+| Data processing workflows | 15-20 minutes | `executeWithTimeout()` |
+| File processing | 20-30 minutes | `executeWithTimeout()` |
+| Large data workflows | 30+ minutes | `executeWithTimeout()` |
 
-## 🔗 API Integration
+## 🔗 Webhook Integration
 
 ### Request Format
-The library sends HTTP POST requests to Langflow with this structure:
+The library sends HTTP POST requests to n8n webhooks with your custom payload:
 
 ```json
 {
-    "output_type": "text",
-    "input_type": "text", 
-    "input_value": "user prompt here"
+    "user": "john_doe",
+    "action": "process_order",
+    "order_id": 12345,
+    "items": ["item1", "item2"]
 }
 ```
 
 ### Headers
 ```
-Content-Type: application/json
-x-api-key: your-api-key-here
+Content-Type: application/json (or custom)
+Authorization: Bearer your-api-key-here (if provided)
 ```
 
 ### Response Processing
-The library automatically extracts meaningful content from Langflow responses:
-1. Searches for structured response in `outputs[].results.message.text`
-2. Falls back to common fields like `text`, `message`, `response`
-3. Returns raw response if parsing fails
+The library automatically processes n8n webhook responses:
+1. Searches for structured response in common fields like `result`, `data`, `message`, `response`
+2. Returns raw response if no structured data found
+3. Handles various content types returned by n8n
 
 ## 🛡️ Error Handling
 
 The library provides comprehensive validation:
 
-- **API Key Validation**: "API Key is required and cannot be empty"
-- **Endpoint Validation**: "API Endpoint must be a valid URL"
-- **Input Validation**: "User prompt is required and cannot be empty"
-- **HTTP Errors**: "API request failed with status code: XXX"
+- **Endpoint Validation**: "Webhook endpoint is required and cannot be empty"
+- **URL Validation**: "Webhook endpoint must be a valid URL"
+- **HTTP Errors**: "Webhook request failed with status code: XXX"
 - **Timeout Errors**: "Request timeout after X minutes"
 
 ## 🧪 Testing
@@ -148,38 +155,55 @@ The library provides comprehensive validation:
 ```bash
 ./gradlew run
 # or
-java -cp "build/classes" com.company.mendix.langflow.examples.LangflowExample
+java -cp "build/classes" com.company.mendix.n8n.examples.N8nExample
 ```
 
 ## 📁 Project Structure
 
 ```
 src/
-├── main/java/com/company/mendix/langflow/
-│   ├── LangflowAction.java          # Main implementation
+├── main/java/com/company/mendix/n8n/
+│   ├── N8nAction.java                   # Main implementation
 │   └── examples/
-│       └── LangflowExample.java     # Usage examples
-└── test/java/com/company/mendix/langflow/
-    └── LangflowActionTest.java      # Unit tests
+│       └── N8nExample.java              # Usage examples
+└── test/java/com/company/mendix/n8n/
+    └── N8nActionTest.java               # Unit tests
 
-deploy-to-mendix.ps1                 # Automated deployment script
-quick-deploy.bat                     # Quick deployment batch file
-build.gradle                         # Build configuration
+deploy-to-mendix.ps1                     # Automated deployment script
+quick-deploy.bat                         # Quick deployment batch file
+build.gradle                             # Build configuration
 ```
 
-## 🚀 Quick Start Example
+## 🚀 Quick Start Examples
 
+### Example 1: Basic Webhook Call
 ```java
 // In your Mendix Java Action
-String apiKey = "your-langflow-api-key";
-String apiEndpoint = "http://localhost:7860/api/v1/run/your-flow-id";
-String userPrompt = "What is machine learning?";
+String apiKey = null; // No authentication needed
+String webhookEndpoint = "https://your-n8n.com/webhook/simple-workflow";
+String inputData = "{\"message\": \"Hello from Mendix!\", \"user\": \"john\"}";
 
-// Simple call (10-minute timeout)
-String result = LangflowAction.execute(apiKey, apiEndpoint, userPrompt);
+String result = N8nAction.execute(apiKey, webhookEndpoint, inputData);
+```
 
-// Custom timeout for complex processes
-String result = LangflowAction.executeWithTimeout(apiKey, apiEndpoint, userPrompt, 20);
+### Example 2: Authenticated Webhook
+```java
+String apiKey = "your-n8n-api-key";
+String webhookEndpoint = "https://your-n8n.com/webhook/secure-workflow";
+String inputData = "{\"action\": \"process_order\", \"order_id\": 12345}";
+
+String result = N8nAction.execute(apiKey, webhookEndpoint, inputData);
+```
+
+### Example 3: Custom Timeout for Long Workflows
+```java
+String result = N8nAction.executeWithTimeout(apiKey, webhookEndpoint, inputData, 20);
+```
+
+### Example 4: Custom Content Type
+```java
+String xmlData = "<?xml version=\"1.0\"?><order><id>123</id></order>";
+String result = N8nAction.execute(apiKey, webhookEndpoint, xmlData, "application/xml");
 ```
 
 ## 🔧 Development
@@ -213,45 +237,83 @@ String result = LangflowAction.executeWithTimeout(apiKey, apiEndpoint, userPromp
 
 2. **Timeout errors**
    - Increase timeout using `executeWithTimeout()`
-   - Check Langflow server performance
+   - Check n8n workflow performance
 
 3. **Connection errors**
-   - Verify Langflow server is running
-   - Check endpoint URL and API key
+   - Verify n8n instance is running and accessible
+   - Check webhook URL and API key (if required)
    - Confirm network connectivity
+
+4. **Authentication errors**
+   - Verify API key is correct
+   - Check if webhook requires authentication
+   - Ensure webhook is published and active
 
 ### Debug Output
 The library outputs debug information to help with troubleshooting:
 ```
-Executing Langflow API call to endpoint: http://localhost:7860/...
-User prompt length: 25 characters
-Request payload: {"output_type":"text",...}
-API request sent, waiting for Langflow response (timeout: 10 minutes)...
+Executing n8n webhook call to endpoint: https://your-n8n.com/webhook/...
+Input data length: 45 characters
+Request payload: {"message":"Hello from Mendix!"}
+API request sent, waiting for n8n response (timeout: 10 minutes)...
 Response status code: 200
 ```
 
-## Python to Java Migration
+## 📊 n8n Workflow Examples
 
-This Java implementation replicates the functionality of this Python code:
-
-```python
-payload = {
-    "output_type": "text",
-    "input_type": "text", 
-    "input_value": "hello world!"
+### Example Workflow 1: Data Processing
+```json
+{
+  "trigger": "webhook",
+  "nodes": [
+    {
+      "name": "Webhook",
+      "type": "webhook",
+      "parameters": {
+        "path": "process-data"
+      }
+    },
+    {
+      "name": "Process Data",
+      "type": "function",
+      "parameters": {
+        "code": "return [{ json: { result: 'processed', data: items[0].json } }];"
+      }
+    },
+    {
+      "name": "Return Response",
+      "type": "respond",
+      "parameters": {
+        "response": "{{ $json.result }}"
+      }
+    }
+  ]
 }
-
-headers = {
-    "Content-Type": "application/json",
-    "x-api-key": api_key
-}
-
-response = requests.request("POST", url, json=payload, headers=headers)
 ```
 
-**Equivalent Java Action call:**
-```java
-String result = LangflowAction.execute(apiKey, apiEndpoint, userPrompt);
+### Example Workflow 2: Email Notification
+```json
+{
+  "trigger": "webhook",
+  "nodes": [
+    {
+      "name": "Webhook",
+      "type": "webhook",
+      "parameters": {
+        "path": "send-notification"
+      }
+    },
+    {
+      "name": "Send Email",
+      "type": "emailSend",
+      "parameters": {
+        "to": "{{ $json.email }}",
+        "subject": "Notification from Mendix",
+        "text": "{{ $json.message }}"
+      }
+    }
+  ]
+}
 ```
 
 ## 📄 License
@@ -264,10 +326,11 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## 🔗 Links
 
-- [Langflow Documentation](https://docs.langflow.org/)
+- [n8n Documentation](https://docs.n8n.io/)
+- [n8n Webhook Documentation](https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.webhook/)
 - [Mendix Documentation](https://docs.mendix.com/)
 - [Java Action Documentation](https://docs.mendix.com/howto/logic-business-rules/java-actions/)
 
 ---
 
-**Made with ❤️ for Mendix and Langflow integration**
+**Made with ❤️ for Mendix and n8n integration**
